@@ -9,7 +9,11 @@ import http, { IncomingMessage, ServerResponse } from 'node:http';
 import worker from './index';
 import { Env } from './types/env';
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8787;
+const PORT = process.env.BACKEND_PORT
+  ? parseInt(process.env.BACKEND_PORT, 10)
+  : (process.env.PORT && process.env.PORT !== '8080' && process.env.PORT !== '3000'
+      ? parseInt(process.env.PORT, 10)
+      : 8787);
 
 const mockEnv: Env = {
   ASSET_CACHE_KV: null as any,

@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/node-server.ts",
+    "dev:server": "tsx src/node-server.ts",
     "dev:node": "tsx src/node-server.ts",
     "dev:wrangler": "wrangler dev",
+    "start": "tsx src/node-server.ts",
     "deploy": "wrangler deploy",
     "d1:init": "wrangler d1 execute tryon-db --file=./schema.sql --local",
     "typecheck": "tsc --noEmit"
