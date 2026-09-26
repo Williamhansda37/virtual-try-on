@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev:web-demo": "cd web-demo && vite --port=5173 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "build:extension": "cd extension && vite build",

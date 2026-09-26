@@ -1,9 +1,9 @@
 import React from 'react';
-import { Layers, Activity, BookOpen, Terminal, Sparkles, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Layers, Activity, BookOpen, Terminal, Sparkles, CheckCircle2, ShieldAlert, Video } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'health' | 'architecture' | 'viewport' | 'runbook';
-  setActiveTab: (tab: 'health' | 'architecture' | 'viewport' | 'runbook') => void;
+  activeTab: 'studio' | 'health' | 'architecture' | 'viewport' | 'runbook';
+  setActiveTab: (tab: 'studio' | 'health' | 'architecture' | 'viewport' | 'runbook') => void;
   systemHealthy: boolean;
   onRunDiagnostics: () => void;
   isRunningDiagnostics: boolean;
@@ -75,6 +75,18 @@ export const MTechProjectHeader: React.FC<HeaderProps> = ({
 
         {/* Navigation Tabs */}
         <div className="flex items-center gap-1 border-t border-slate-800/80 -mb-px overflow-x-auto text-sm">
+          <button
+            onClick={() => setActiveTab('studio')}
+            className={`flex items-center gap-2 px-4 py-3 font-semibold border-b-2 transition whitespace-nowrap ${
+              activeTab === 'studio'
+                ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10'
+                : 'border-transparent text-emerald-400/80 hover:text-emerald-300'
+            }`}
+          >
+            <Video className="w-4 h-4 text-emerald-400" />
+            <span>⚡ Live Camera Studio</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('health')}
             className={`flex items-center gap-2 px-4 py-3 font-medium border-b-2 transition whitespace-nowrap ${

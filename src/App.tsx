@@ -11,6 +11,7 @@ import { MonorepoWorkspaceCard } from './components/MonorepoWorkspaceCard';
 import { ThreeCanvasTestbed } from './components/ThreeCanvasTestbed';
 import { HowToRunModal } from './components/HowToRunModal';
 import { ArchitectureFlowView } from './components/ArchitectureFlowView';
+import { LiveCameraStudio } from './components/LiveCameraStudio';
 import {
   DiagnosticResult,
   checkWebGL2Support,
@@ -22,7 +23,7 @@ import {
 } from './services/health-checker';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'health' | 'architecture' | 'viewport' | 'runbook'>('health');
+  const [activeTab, setActiveTab] = useState<'studio' | 'health' | 'architecture' | 'viewport' | 'runbook'>('studio');
   const [diagnostics, setDiagnostics] = useState<DiagnosticResult[]>([]);
   const [isRunningDiagnostics, setIsRunningDiagnostics] = useState<boolean>(false);
 
@@ -65,6 +66,12 @@ export default function App() {
 
       {/* Main Content View */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {activeTab === 'studio' && (
+          <div className="space-y-8">
+            <LiveCameraStudio />
+          </div>
+        )}
+
         {activeTab === 'health' && (
           <div className="space-y-8">
             <SystemDiagnosticsPanel
