@@ -11,11 +11,67 @@ export const Popup: React.FC = () => {
   const [category, setCategory] = useState<TryOnCategory>('eyewear');
   const [style, setStyle] = useState<TryOnStyle>('gold');
   const [targetTabTitle, setTargetTabTitle] = useState<string>('Current Shopping Tab');
+  const [isRestrictedTab, setIsRestrictedTab] = useState<boolean>(false);
+
+  // Safe tab messenger that handles missing content scripts and injects dynamically
+  const sendToActiveTab = async (message: any): Promise<any> => {
+    if (typeof chrome === 'undefined' || !chrome.tabs) return null;
+    return new Promise((resolve) => {
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs: any[]) => {
+        const tab = tabs[0];
+        if (!tab?.id) {
+          resolve(null);
+          return;
+        }
+
+        const tabUrl = tab.url || '';
+        if (
+          tabUrl.startsWith('chrome://') ||
+          tabUrl.startsWith('chrome-extension://') ||
+          tabUrl.startsWith('edge://') ||
+          tabUrl.startsWith('about:')
+        ) {
+          setIsRestrictedTab(true);
+          resolve(null);
+          return;
+        }
+
+        setIsRestrictedTab(false);
+
+        // Attempt initial message
+        chrome.tabs.sendMessage(tab.id, message, async (response: any) => {
+          if (chrome.runtime?.lastError) {
+            // Content script not loaded yet - inject on the fly if permissions allow
+            if (chrome.scripting) {
+              try {
+                await chrome.scripting.executeScript({
+                  target: { tabId: tab.id },
+                  files: ['content.js'],
+                });
+                // Small grace period for DOM attachment
+                setTimeout(() => {
+                  chrome.tabs.sendMessage(tab.id, message, (resp2: any) => {
+                    resolve(resp2 || null);
+                  });
+                }, 150);
+                return;
+              } catch (injectionErr) {
+                resolve(null);
+                return;
+              }
+            }
+            resolve(null);
+            return;
+          }
+          resolve(response || null);
+        });
+      });
+    });
+  };
 
   // Query active tab state on mount
   useEffect(() => {
     if (typeof chrome !== 'undefined') {
-      // Load stored preferences
       if (chrome.storage?.local) {
         chrome.storage.local.get(['tryOnEnabled', 'activeCategory', 'activeStyle'], (result: any) => {
           if (result.activeCategory) setCategory(result.activeCategory);
@@ -23,52 +79,43 @@ export const Popup: React.FC = () => {
         });
       }
 
-      // Query active tab for actual live status
       if (chrome.tabs?.query) {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
-          if (tabs[0]?.id) {
-            if (tabs[0].title) setTargetTabTitle(tabs[0].title.slice(0, 28) + '...');
-            chrome.tabs.sendMessage(tabs[0].id, { action: 'GET_STATUS' }, (resp: any) => {
-              if (chrome.runtime?.lastError) {
-                // Tab doesn't have content script yet or is internal page
-                return;
-              }
-              if (resp && typeof resp.isOpen === 'boolean') {
-                setIsActive(resp.isOpen);
-              }
-            });
+          const tab = tabs[0];
+          if (tab?.title) setTargetTabTitle(tab.title.slice(0, 26) + '...');
+          const tabUrl = tab?.url || '';
+          if (
+            tabUrl.startsWith('chrome://') ||
+            tabUrl.startsWith('chrome-extension://') ||
+            tabUrl.startsWith('edge://') ||
+            tabUrl.startsWith('about:')
+          ) {
+            setIsRestrictedTab(true);
+            return;
           }
+
+          sendToActiveTab({ action: 'GET_STATUS' }).then((resp) => {
+            if (resp && typeof resp.isOpen === 'boolean') {
+              setIsActive(resp.isOpen);
+            }
+          });
         });
       }
     }
   }, []);
 
-  const handleToggle = () => {
+  const handleToggle = async () => {
     const nextState = !isActive;
     setIsActive(nextState);
 
-    if (typeof chrome !== 'undefined' && chrome.tabs) {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(
-            tabs[0].id,
-            {
-              action: nextState ? 'ENABLE_TRY_ON' : 'DISABLE_TRY_ON',
-              category,
-              style,
-            },
-            (resp: any) => {
-              if (chrome.runtime?.lastError) {
-                console.log('[Try-On Popup] Note: Content script not ready on this tab yet.');
-              }
-            }
-          );
-        }
-      });
+    await sendToActiveTab({
+      action: nextState ? 'ENABLE_TRY_ON' : 'DISABLE_TRY_ON',
+      category,
+      style,
+    });
 
-      if (chrome.storage?.local) {
-        chrome.storage.local.set({ tryOnEnabled: nextState });
-      }
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({ tryOnEnabled: nextState });
     }
   };
 
@@ -78,13 +125,7 @@ export const Popup: React.FC = () => {
       if (chrome.storage?.local) {
         chrome.storage.local.set({ activeCategory: cat });
       }
-      if (chrome.tabs) {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
-          if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, { action: 'SET_CATEGORY', category: cat });
-          }
-        });
-      }
+      sendToActiveTab({ action: 'SET_CATEGORY', category: cat });
     }
   };
 
@@ -94,19 +135,12 @@ export const Popup: React.FC = () => {
       if (chrome.storage?.local) {
         chrome.storage.local.set({ activeStyle: st });
       }
-      if (chrome.tabs) {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
-          if (tabs[0]?.id) {
-            chrome.tabs.sendMessage(tabs[0].id, { action: 'SET_STYLE', style: st });
-          }
-        });
-      }
+      sendToActiveTab({ action: 'SET_STYLE', style: st });
     }
   };
 
-  const handleOpenStandalone = () => {
+  const handleOpenTestPage = () => {
     if (typeof chrome !== 'undefined' && chrome.tabs) {
-      // Open web demo or studio in new tab
       chrome.tabs.create({ url: 'http://localhost:3000' });
     }
   };
@@ -131,6 +165,31 @@ export const Popup: React.FC = () => {
 
       {/* Main Activation Card with Clear Action Button */}
       <div style={{ marginTop: '14px', padding: '14px', borderRadius: '12px', backgroundColor: '#0f172a', border: '1px solid #1e293b' }}>
+        {isRestrictedTab && (
+          <div style={{ marginBottom: '12px', padding: '10px', borderRadius: '8px', backgroundColor: '#451a03', border: '1px solid #78350f', fontSize: '11px', color: '#fef3c7' }}>
+            <div style={{ fontWeight: 600, marginBottom: '4px' }}>⚠️ Internal Browser Tab Detected</div>
+            <p style={{ margin: '0 0 8px 0', fontSize: '10px', color: '#fde68a', lineHeight: 1.4 }}>
+              Chrome prevents extensions from running on <code>chrome://</code> pages. Switch to any website (e.g. Google, Amazon) or launch the test store below:
+            </p>
+            <button
+              onClick={handleOpenTestPage}
+              style={{
+                width: '100%',
+                padding: '6px',
+                backgroundColor: '#d97706',
+                border: 'none',
+                borderRadius: '6px',
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: '11px',
+                cursor: 'pointer',
+              }}
+            >
+              Open Test Store in New Tab
+            </button>
+          </div>
+        )}
+
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
           <span style={{ fontWeight: 600, fontSize: '12px', color: '#cbd5e1' }}>Webpage Try-On Camera</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: isActive ? '#34d399' : '#94a3b8' }}>
@@ -314,7 +373,7 @@ export const Popup: React.FC = () => {
       {/* Standalone Studio Mode Link */}
       <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #1e293b' }}>
         <button
-          onClick={handleOpenStandalone}
+          onClick={handleOpenTestPage}
           style={{
             width: '100%',
             display: 'flex',

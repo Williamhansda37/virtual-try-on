@@ -263,8 +263,14 @@ export const LiveCameraStudio: React.FC = () => {
                 const r = d[i];
                 const g = d[i + 1];
                 const b = d[i + 2];
-                // Human skin chromaticity detector
-                if (r > 60 && g > 40 && b > 20 && r - g > 15 && r > b) {
+
+                // YCbCr skin detection (standard IEEE computer vision invariant to lighting)
+                const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+                const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+                const isSkinYCbCr = cb >= 75 && cb <= 138 && cr >= 125 && cr <= 182;
+                const isSkinRGB = r > 45 && g > 25 && b > 18 && (r >= g || Math.abs(r - g) < 25) && r > b - 20;
+
+                if (isSkinYCbCr || isSkinRGB) {
                   sumX += x;
                   sumY += y;
                   count++;
@@ -276,47 +282,97 @@ export const LiveCameraStudio: React.FC = () => {
               }
             }
 
-            if (count > 80) {
+            if (count > 15) {
               const avgX = sumX / count;
               const avgY = sumY / count;
               const boxW = Math.max(20, maxX - minX);
               const boxH = Math.max(25, maxY - minY);
 
-              // Extract Eye and Nose Landmark Features
-              // In face geometry: eye level is at ~35-42% of face height from top
+              // 1. Landmark Feature Extraction (Analysis resolution)
               const eyeY = minY + boxH * 0.38;
               const leftEyeX = minX + boxW * 0.32;
               const rightEyeX = minX + boxW * 0.68;
               const noseBridgeX = avgX;
               const noseBridgeY = minY + boxH * 0.44;
 
-              // Mirror correction (camera is mirrored horizontally)
-              const normX = -(avgX / analysis.width - 0.5) * 3.2;
-              const normY = -(noseBridgeY / analysis.height - 0.45) * 2.4;
+              // Anchor selection
+              let anchorRawX = noseBridgeX;
+              let anchorRawY = noseBridgeY;
+              if (category === 'jewelry') {
+                anchorRawY = Math.min(analysis.height - 4, maxY + boxH * 0.18);
+              }
 
-              // Z depth estimated from face width (nominal IPD = 63.5 mm)
+              // 2. Exact Perspective Camera Ray Unprojection
+              const ndcX = 1 - (2 * anchorRawX) / analysis.width;
+              const ndcY = 1 - (2 * anchorRawY) / analysis.height;
+
+              const fovRad = (45 * Math.PI) / 180;
+              const camZ = 3.8;
+              const targetZ = 0;
+              const distFromCam = camZ - targetZ;
+              const visibleHalfH = distFromCam * Math.tan(fovRad / 2);
+              const canvasW = canvasRef.current?.clientWidth || 640;
+              const canvasH = canvasRef.current?.clientHeight || 480;
+              const aspect = canvasW / Math.max(1, canvasH);
+              const visibleHalfW = visibleHalfH * aspect;
+
+              const exactWorldX = ndcX * visibleHalfW;
+              const exactWorldY = ndcY * visibleHalfH;
+
+              // 3. Distance & Scale Matching
               const faceSpanRatio = boxW / analysis.width;
-              const normZ = (faceSpanRatio - 0.42) * 1.6;
+              const distanceRatio = Math.max(0.65, Math.min(1.7, faceSpanRatio / 0.38));
+              const exactWorldZ = (faceSpanRatio - 0.38) * 1.5;
 
-              // Calculate Roll angle (ear-to-ear tilt) and Yaw angle (turning left/right)
-              const dx = (rightEyeX - leftEyeX);
-              const dy = 0; // Baseline
-              const yawAngleRad = (noseBridgeX - (leftEyeX + rightEyeX) / 2) / (boxW * 0.5);
-              const yawDeg = Math.round(yawAngleRad * 45);
-              const pitchDeg = Math.round(((noseBridgeY - eyeY) / boxH - 0.12) * 60);
-              const rollDeg = Math.round(normX * 12);
-              const calculatedIpd = Math.round(63.5 * (1 + (faceSpanRatio - 0.35) * 0.5) * 10) / 10;
+              // Scale matching
+              const dynamicScale = scale * distanceRatio;
+              modelRoot.scale.setScalar(dynamicScale);
 
-              // Apply low-latency Exponential Moving Average filter
-              const smoothed = positionFilterRef.current.filter({ x: normX, y: normY, z: normZ });
-              modelRoot.position.set(smoothed.x, smoothed.y, smoothed.z);
+              // 4. Anatomical Head Pose Calculation:
+              const rollAngleRad = 0; // Baseline upright
 
-              const smoothedRot = rotationFilterRef.current.filter({
-                x: -normY * 0.15 + pitchDeg * (Math.PI / 180) * 0.4,
-                y: normX * 0.3 + yawAngleRad * 0.5,
-                z: rollDeg * (Math.PI / 180) * 0.3,
-              });
-              modelRoot.rotation.set(smoothedRot.x, smoothedRot.y, smoothedRot.z);
+              const distToLeftCheek = noseBridgeX - minX;
+              const distToRightCheek = maxX - noseBridgeX;
+              const yawAsymmetry = (distToLeftCheek - distToRightCheek) / Math.max(1, distToLeftCheek + distToRightCheek);
+              const yawAngleRad = Math.max(-0.7, Math.min(0.7, -yawAsymmetry * 0.95));
+              const yawDeg = Math.round(yawAngleRad * (180 / Math.PI));
+
+              const faceHeightRatio = (noseBridgeY - minY) / Math.max(1, boxH);
+              const pitchAngleRad = Math.max(-0.45, Math.min(0.45, (faceHeightRatio - 0.44) * 1.2));
+              const pitchDeg = Math.round(pitchAngleRad * (180 / Math.PI));
+              const rollDeg = 0;
+
+              const calculatedIpd = Math.round(63.5 * distanceRatio * 10) / 10;
+
+              // 5. Apply low-latency Exponential Moving Average filter
+              if (category === 'watch') {
+                const smoothed = positionFilterRef.current.filter({
+                  x: exactWorldX + 0.65,
+                  y: exactWorldY - 0.85,
+                  z: exactWorldZ + 0.2,
+                });
+                modelRoot.position.set(smoothed.x, smoothed.y, smoothed.z);
+                const smoothedRot = rotationFilterRef.current.filter({
+                  x: Math.PI / 4,
+                  y: yawAngleRad * 0.4,
+                  z: -0.2,
+                });
+                modelRoot.rotation.set(smoothedRot.x, smoothedRot.y, smoothedRot.z);
+              } else {
+                const smoothed = positionFilterRef.current.filter({
+                  x: exactWorldX,
+                  y: exactWorldY,
+                  z: exactWorldZ,
+                });
+                modelRoot.position.set(smoothed.x, smoothed.y, smoothed.z);
+
+                const smoothedRot = rotationFilterRef.current.filter({
+                  x: pitchAngleRad,
+                  y: yawAngleRad,
+                  z: rollAngleRad,
+                });
+                modelRoot.rotation.set(smoothedRot.x, smoothedRot.y, smoothedRot.z);
+              }
 
               setTrackingConfidence(Math.min(99, 88 + Math.round((count / (analysis.width * analysis.height * 0.25)) * 11)));
 
