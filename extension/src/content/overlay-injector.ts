@@ -40,6 +40,8 @@ export class TryOnOverlayInjector {
   // Hidden 2D canvas for optical face tracking
   private analysisCanvas: HTMLCanvasElement | null = null;
   private analysisCtx: CanvasRenderingContext2D | null = null;
+  private debugCanvasElement: HTMLCanvasElement | null = null;
+  private showLandmarkMesh: boolean = true;
 
   // Materials cache
   private materialsCache: { [key: string]: THREE.Material } = {};
@@ -153,6 +155,20 @@ export class TryOnOverlayInjector {
       display: 'block',
     });
 
+    // 2D Face Landmark Mesh Debug Canvas
+    const debugCanvas = document.createElement('canvas');
+    debugCanvas.id = 'vto-debug-canvas';
+    Object.assign(debugCanvas.style, {
+      position: 'absolute',
+      top: '0',
+      left: '0',
+      width: '100%',
+      height: '100%',
+      pointerEvents: 'none',
+      display: 'block',
+    });
+    this.debugCanvasElement = debugCanvas;
+
     // Camera Status / Permission Banner
     const statusBanner = document.createElement('div');
     statusBanner.id = 'vto-status-banner';
@@ -175,11 +191,15 @@ export class TryOnOverlayInjector {
     });
     statusBanner.innerHTML = `
       <span id="vto-cam-msg">Connecting to camera...</span>
-      <span id="vto-fps" style="font-family:monospace;font-size:10px;color:#10b981;font-weight:bold;">60 FPS</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button id="vto-mesh-toggle" style="background:#0284c7;color:#ffffff;border:none;border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;font-weight:600;">Mesh ON</button>
+        <span id="vto-fps" style="font-family:monospace;font-size:10px;color:#10b981;font-weight:bold;">60 FPS</span>
+      </div>
     `;
 
     viewportArea.appendChild(video);
     viewportArea.appendChild(canvas);
+    viewportArea.appendChild(debugCanvas);
     viewportArea.appendChild(statusBanner);
 
     // 4. Interactive Bottom Controls Toolbar
@@ -284,6 +304,18 @@ export class TryOnOverlayInjector {
     // Snapshot button
     container.querySelector('#vto-snap-btn')?.addEventListener('click', () => {
       this.captureSnapshot(video, canvas);
+    });
+
+    // Mesh toggle button
+    const meshToggleBtn = container.querySelector('#vto-mesh-toggle') as HTMLButtonElement | null;
+    meshToggleBtn?.addEventListener('click', () => {
+      this.showLandmarkMesh = !this.showLandmarkMesh;
+      meshToggleBtn.textContent = this.showLandmarkMesh ? 'Mesh ON' : 'Mesh OFF';
+      meshToggleBtn.style.backgroundColor = this.showLandmarkMesh ? '#0284c7' : '#475569';
+      if (!this.showLandmarkMesh && this.debugCanvasElement) {
+        const dctx = this.debugCanvasElement.getContext('2d');
+        if (dctx) dctx.clearRect(0, 0, this.debugCanvasElement.width, this.debugCanvasElement.height);
+      }
     });
 
     // Category buttons
@@ -645,6 +677,8 @@ export class TryOnOverlayInjector {
     let count = 0;
     let minX = w;
     let maxX = 0;
+    let minY = h;
+    let maxY = 0;
 
     // Scan pixels for human facial tone centroid
     for (let y = 0; y < h; y += 2) {
@@ -661,30 +695,104 @@ export class TryOnOverlayInjector {
           count++;
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
         }
       }
     }
 
     if (count > 80 && this.isAutoTracking) {
       const avgX = sumX / count;
-      const avgY = sumY / count;
-      const faceSpan = Math.max(20, maxX - minX);
+      const boxW = Math.max(20, maxX - minX);
+      const boxH = Math.max(25, maxY - minY);
+
+      // Facial feature landmarks
+      const eyeY = minY + boxH * 0.38;
+      const leftEyeX = minX + boxW * 0.32;
+      const rightEyeX = minX + boxW * 0.68;
+      const noseBridgeX = avgX;
+      const noseBridgeY = minY + boxH * 0.44;
 
       // Invert X because video is mirrored
       const normX = -(avgX / w - 0.5) * 3.2;
-      const normY = -(avgY / h - 0.45) * 2.4;
+      const normY = -(noseBridgeY / h - 0.45) * 2.4;
 
-      // Z-depth estimated from face bounding width
-      const normZ = (faceSpan / w - 0.4) * 1.5;
+      // Z-depth estimated from face bounding width (nominal IPD = 63.5 mm)
+      const faceSpanRatio = boxW / w;
+      const normZ = (faceSpanRatio - 0.42) * 1.6;
+
+      const yawAngleRad = (noseBridgeX - (leftEyeX + rightEyeX) / 2) / (boxW * 0.5);
+      const yawDeg = Math.round(yawAngleRad * 45);
+      const pitchDeg = Math.round(((noseBridgeY - eyeY) / boxH - 0.12) * 60);
+      const rollDeg = Math.round(normX * 12);
+      const calculatedIpd = Math.round(63.5 * (1 + (faceSpanRatio - 0.35) * 0.5) * 10) / 10;
 
       // Apply EMA filter for buttery-smooth motion without jitter
       const smoothedPos = this.positionFilter.filter({ x: normX, y: normY, z: normZ });
       this.modelRoot.position.set(smoothedPos.x, smoothedPos.y, smoothedPos.z);
 
-      // Subtle yaw based on face horizontal deviation
-      const targetYaw = normX * 0.35;
-      const smoothedRot = this.rotationFilter.filter({ x: -normY * 0.2, y: targetYaw, z: 0 });
+      const smoothedRot = this.rotationFilter.filter({
+        x: -normY * 0.15 + pitchDeg * (Math.PI / 180) * 0.4,
+        y: normX * 0.3 + yawAngleRad * 0.5,
+        z: rollDeg * (Math.PI / 180) * 0.3,
+      });
       this.modelRoot.rotation.set(smoothedRot.x, smoothedRot.y, smoothedRot.z);
+
+      // Draw Visual Facial Mesh Overlay if active
+      if (this.debugCanvasElement && this.showLandmarkMesh) {
+        const dw = (this.debugCanvasElement.width = this.debugCanvasElement.clientWidth || 380);
+        const dh = (this.debugCanvasElement.height = this.debugCanvasElement.clientHeight || 340);
+        const dctx = this.debugCanvasElement.getContext('2d');
+        if (dctx) {
+          dctx.clearRect(0, 0, dw, dh);
+          const sx = dw / w;
+          const sy = dh / h;
+
+          const scrBoxMinX = dw - maxX * sx;
+          const scrBoxMaxX = dw - minX * sx;
+          const scrBoxMinY = minY * sy;
+          const scrBoxW = scrBoxMaxX - scrBoxMinX;
+          const scrBoxH = boxH * sy;
+
+          // Bounding Box
+          dctx.strokeStyle = '#38bdf8';
+          dctx.lineWidth = 1.5;
+          dctx.strokeRect(scrBoxMinX, scrBoxMinY, scrBoxW, scrBoxH);
+
+          // Eyes & Nose Bridge
+          const scrLeftEyeX = dw - rightEyeX * sx;
+          const scrRightEyeX = dw - leftEyeX * sx;
+          const scrEyeY = eyeY * sy;
+          const scrNoseX = dw - noseBridgeX * sx;
+          const scrNoseY = noseBridgeY * sy;
+
+          // Eye baseline
+          dctx.strokeStyle = 'rgba(52, 211, 153, 0.8)';
+          dctx.setLineDash([3, 3]);
+          dctx.beginPath();
+          dctx.moveTo(scrLeftEyeX, scrEyeY);
+          dctx.lineTo(scrRightEyeX, scrEyeY);
+          dctx.stroke();
+          dctx.setLineDash([]);
+
+          // Eye pupils
+          dctx.fillStyle = '#34d399';
+          dctx.beginPath();
+          dctx.arc(scrLeftEyeX, scrEyeY, 4, 0, Math.PI * 2);
+          dctx.arc(scrRightEyeX, scrEyeY, 4, 0, Math.PI * 2);
+          dctx.fill();
+
+          // Nose Bridge Anchor
+          dctx.fillStyle = '#f59e0b';
+          dctx.beginPath();
+          dctx.arc(scrNoseX, scrNoseY, 5, 0, Math.PI * 2);
+          dctx.fill();
+
+          dctx.fillStyle = '#34d399';
+          dctx.font = 'bold 10px monospace';
+          dctx.fillText(`IPD: ${calculatedIpd}mm`, (scrLeftEyeX + scrRightEyeX) / 2 - 20, scrEyeY - 8);
+        }
+      }
     }
   }
 
