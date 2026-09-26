@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+import { FaceLandmarker, FilesetResolver } from '../vendor/vision_bundle.js';
 import { Vector3EMAFilter } from '../../../shared/math/filter';
 
 declare const chrome: any;
