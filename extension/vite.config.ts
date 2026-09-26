@@ -2,6 +2,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const mediapipeVisionPath = require.resolve('@mediapipe/tasks-vision').replace(/\.cjs$/, '.mjs');
 
 export default defineConfig({
   plugins: [
@@ -64,10 +68,14 @@ export default defineConfig({
   ],
   base: '',
   resolve: {
-    alias: {
-      '@shared': path.resolve(import.meta.dirname, '../shared'),
-      '@': path.resolve(import.meta.dirname, './src'),
-    },
+    alias: [
+      { find: '@shared', replacement: path.resolve(import.meta.dirname, '../shared') },
+      { find: '@', replacement: path.resolve(import.meta.dirname, './src') },
+      {
+        find: '@mediapipe/tasks-vision',
+        replacement: mediapipeVisionPath,
+      },
+    ],
   },
   build: {
     outDir: 'dist',
