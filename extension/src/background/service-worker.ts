@@ -18,7 +18,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onInstalled) {
       chrome.storage.local.set({
         tryOnEnabled: false,
         activeCategory: 'eyewear',
-        apiEndpoint: 'http://localhost:8787/api',
+        activeStyle: 'gold',
+        standaloneMode: true,
       });
     }
   });
