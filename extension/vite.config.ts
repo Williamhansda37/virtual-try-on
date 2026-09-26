@@ -50,11 +50,14 @@ export default defineConfig({
           }
         }
 
-        // Sync assets directory to extension root
-        const srcAssets = path.join(distDir, 'assets');
-        const destAssets = path.join(rootDir, 'assets');
-        if (fs.existsSync(srcAssets)) {
-          fs.cpSync(srcAssets, destAssets, { recursive: true });
+        // Sync assets, models, and wasm directory to extension root
+        const dirsToSync = ['assets', 'models', 'wasm'];
+        for (const dir of dirsToSync) {
+          const srcDir = path.join(distDir, dir);
+          const destDir = path.join(rootDir, dir);
+          if (fs.existsSync(srcDir)) {
+            fs.cpSync(srcDir, destDir, { recursive: true });
+          }
         }
       },
     },

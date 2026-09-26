@@ -30,7 +30,8 @@
     {
       "resources": [
         "assets/*",
-        "models/*"
+        "models/*",
+        "wasm/*"
       ],
       "matches": ["<all_urls>"]
     }
