@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "types": ["vite/client"],
+    "paths": {
+      "@shared/*": ["../shared/*"],
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*"]
+}

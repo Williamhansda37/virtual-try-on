@@ -1,0 +1,6 @@
+# Python requirements for offline 3D asset processing and validation
+# Note: Blender provides its own bundled Python environment.
+numpy>=1.24.0
+scipy>=1.10.0
+trimesh>=4.0.0
+Pillow>=10.0.0

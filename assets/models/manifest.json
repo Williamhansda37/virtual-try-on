@@ -1,0 +1,46 @@
+{
+  "manifestVersion": "1.0.0",
+  "pipelineVersion": "blender-draco-v1",
+  "updatedAt": "2026-09-26T00:00:00Z",
+  "assets": [
+    {
+      "id": "eyewear-aviator-01",
+      "sku": "AVIATOR-GLD-01",
+      "name": "Aviator Titanium Gold",
+      "category": "eyewear",
+      "targetPolygons": 4800,
+      "anchors": {
+        "primary": "nose_bridge",
+        "landmarkIndices": [168, 6],
+        "scaleCorrection": 1.0
+      },
+      "pbrMaterials": ["frame_gold", "lenses_polarized"]
+    },
+    {
+      "id": "eyewear-wayfarer-02",
+      "sku": "WAYFARER-MATTE-02",
+      "name": "Classic Wayfarer Black",
+      "category": "eyewear",
+      "targetPolygons": 3900,
+      "anchors": {
+        "primary": "nose_bridge",
+        "landmarkIndices": [168, 6],
+        "scaleCorrection": 0.98
+      },
+      "pbrMaterials": ["acetate_black", "lenses_green"]
+    },
+    {
+      "id": "watch-chronograph-01",
+      "sku": "CHRONO-STEEL-42",
+      "name": "42mm Steel Chronograph",
+      "category": "watch",
+      "targetPolygons": 6500,
+      "anchors": {
+        "primary": "left_wrist",
+        "landmarkIndices": [15, 17, 19],
+        "scaleCorrection": 1.0
+      },
+      "pbrMaterials": ["brushed_steel", "sapphire_glass"]
+    }
+  ]
+}

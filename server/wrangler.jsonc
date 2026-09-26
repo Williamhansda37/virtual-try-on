@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "try-on-edge-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "ASSET_CACHE_KV",
+      "id": "tryon_asset_cache_dev",
+      "preview_id": "tryon_asset_cache_preview"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tryon-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "./migrations"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "development",
+    "ALLOWED_ORIGIN": "*"
+  }
+}

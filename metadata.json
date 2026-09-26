@@ -1,0 +1,8 @@
+{
+  "name": "AI-Powered Browser-Based 3D Virtual Try-On",
+  "description": "M.Tech Research Monorepo: AI-Powered Browser-Based 3D Virtual Try-On using Chrome MV3, MediaPipe, Three.js, and Cloudflare Workers.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
