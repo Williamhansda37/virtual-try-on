@@ -9,6 +9,39 @@
     <meta property="og:description" content="M.Tech Research Monorepo: AI-Powered Browser-Based 3D Virtual Try-On using Chrome MV3, MediaPipe, Three.js, and Cloudflare Workers." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      // Filter benign Emscripten/TFLite C++ stderr diagnostic notices (e.g. XNNPACK delegate)
+      (function() {
+        var isTFLiteLog = function(msg) {
+          return typeof msg === 'string' && (
+            msg.indexOf('Created TensorFlow Lite XNNPACK delegate for CPU') !== -1 ||
+            msg.indexOf('XNNPACK delegate') !== -1 ||
+            (msg.indexOf('INFO:') === 0 && msg.indexOf('TensorFlow') !== -1)
+          );
+        };
+        var origError = console.error;
+        console.error = function() {
+          for (var i = 0; i < arguments.length; i++) {
+            if (isTFLiteLog(arguments[i])) return;
+          }
+          return origError.apply(console, arguments);
+        };
+        var origWarn = console.warn;
+        console.warn = function() {
+          for (var i = 0; i < arguments.length; i++) {
+            if (isTFLiteLog(arguments[i])) return;
+          }
+          return origWarn.apply(console, arguments);
+        };
+        var origInfo = console.info;
+        console.info = function() {
+          for (var i = 0; i < arguments.length; i++) {
+            if (isTFLiteLog(arguments[i])) return;
+          }
+          return origInfo.apply(console, arguments);
+        };
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -12,6 +12,7 @@ import { ThreeCanvasTestbed } from './components/ThreeCanvasTestbed';
 import { HowToRunModal } from './components/HowToRunModal';
 import { ArchitectureFlowView } from './components/ArchitectureFlowView';
 import { LiveCameraStudio } from './components/LiveCameraStudio';
+import { EcommerceAiGenerator, GeneratedWearable } from './components/EcommerceAiGenerator';
 import {
   DiagnosticResult,
   checkWebGL2Support,
@@ -23,7 +24,8 @@ import {
 } from './services/health-checker';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'studio' | 'health' | 'architecture' | 'viewport' | 'runbook'>('studio');
+  const [activeTab, setActiveTab] = useState<'studio' | 'ecommerce' | 'health' | 'architecture' | 'viewport' | 'runbook'>('studio');
+  const [selectedWearable, setSelectedWearable] = useState<GeneratedWearable | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticResult[]>([]);
   const [isRunningDiagnostics, setIsRunningDiagnostics] = useState<boolean>(false);
 
@@ -68,7 +70,18 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {activeTab === 'studio' && (
           <div className="space-y-8">
-            <LiveCameraStudio />
+            <LiveCameraStudio customWearable={selectedWearable} />
+          </div>
+        )}
+
+        {activeTab === 'ecommerce' && (
+          <div className="space-y-8">
+            <EcommerceAiGenerator
+              onSelectForTryOn={(wearable) => {
+                setSelectedWearable(wearable);
+                setActiveTab('studio');
+              }}
+            />
           </div>
         )}
 

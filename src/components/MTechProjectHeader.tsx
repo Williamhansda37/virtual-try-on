@@ -1,9 +1,9 @@
 import React from 'react';
-import { Layers, Activity, BookOpen, Terminal, Sparkles, CheckCircle2, ShieldAlert, Video } from 'lucide-react';
+import { Layers, Activity, BookOpen, Terminal, Sparkles, CheckCircle2, ShieldAlert, Video, ShoppingBag } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'studio' | 'health' | 'architecture' | 'viewport' | 'runbook';
-  setActiveTab: (tab: 'studio' | 'health' | 'architecture' | 'viewport' | 'runbook') => void;
+  activeTab: 'studio' | 'ecommerce' | 'health' | 'architecture' | 'viewport' | 'runbook';
+  setActiveTab: (tab: 'studio' | 'ecommerce' | 'health' | 'architecture' | 'viewport' | 'runbook') => void;
   systemHealthy: boolean;
   onRunDiagnostics: () => void;
   isRunningDiagnostics: boolean;
@@ -85,6 +85,18 @@ export const MTechProjectHeader: React.FC<HeaderProps> = ({
           >
             <Video className="w-4 h-4 text-emerald-400" />
             <span>⚡ Live Camera Studio</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('ecommerce')}
+            className={`flex items-center gap-2 px-4 py-3 font-semibold border-b-2 transition whitespace-nowrap cursor-pointer ${
+              activeTab === 'ecommerce'
+                ? 'border-cyan-500 text-cyan-400 bg-cyan-500/10'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShoppingBag className="w-4 h-4 text-cyan-400" />
+            <span>🛍️ E-Commerce & AI 3D Generator</span>
           </button>
 
           <button
